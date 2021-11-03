@@ -1,0 +1,2 @@
+rosbot_description/src/rosbot_description:rosbot_description/src/rosbot_gazebo:rosbot_description/src/rosbot_navigation
+-DCATKIN_DEVEL_PREFIX=/home/yashas/Documents/URS/ros_workspace/devel -DCMAKE_INSTALL_PREFIX=/home/yashas/Documents/URS/ros_workspace/install -G Unix Makefiles
