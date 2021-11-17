@@ -13,21 +13,21 @@ fi
 
 echo_and_run() { echo "+ $@" ; "$@" ; }
 
-echo_and_run cd "/home/yashas/Documents/URS/ros_workspace/src/rosbot_description/src/rosbot_description"
+echo_and_run cd "/home/yashas/Documents/URS-Project/ros_workspace/src/rosbot_description/src/rosbot_description"
 
 # ensure that Python install destination exists
-echo_and_run mkdir -p "$DESTDIR/home/yashas/Documents/URS/ros_workspace/install/lib/python3/dist-packages"
+echo_and_run mkdir -p "$DESTDIR/home/yashas/Documents/URS-Project/ros_workspace/install/lib/python3/dist-packages"
 
 # Note that PYTHONPATH is pulled from the environment to support installing
 # into one location when some dependencies were installed in another
 # location, #123.
 echo_and_run /usr/bin/env \
-    PYTHONPATH="/home/yashas/Documents/URS/ros_workspace/install/lib/python3/dist-packages:/home/yashas/Documents/URS/ros_workspace/build/lib/python3/dist-packages:$PYTHONPATH" \
-    CATKIN_BINARY_DIR="/home/yashas/Documents/URS/ros_workspace/build" \
+    PYTHONPATH="/home/yashas/Documents/URS-Project/ros_workspace/install/lib/python3/dist-packages:/home/yashas/Documents/URS-Project/ros_workspace/build/lib/python3/dist-packages:$PYTHONPATH" \
+    CATKIN_BINARY_DIR="/home/yashas/Documents/URS-Project/ros_workspace/build" \
     "/usr/bin/python3" \
-    "/home/yashas/Documents/URS/ros_workspace/src/rosbot_description/src/rosbot_description/setup.py" \
+    "/home/yashas/Documents/URS-Project/ros_workspace/src/rosbot_description/src/rosbot_description/setup.py" \
      \
-    build --build-base "/home/yashas/Documents/URS/ros_workspace/build/rosbot_description/src/rosbot_description" \
+    build --build-base "/home/yashas/Documents/URS-Project/ros_workspace/build/rosbot_description/src/rosbot_description" \
     install \
     --root="${DESTDIR-/}" \
-    --install-layout=deb --prefix="/home/yashas/Documents/URS/ros_workspace/install" --install-scripts="/home/yashas/Documents/URS/ros_workspace/install/bin"
+    --install-layout=deb --prefix="/home/yashas/Documents/URS-Project/ros_workspace/install" --install-scripts="/home/yashas/Documents/URS-Project/ros_workspace/install/bin"

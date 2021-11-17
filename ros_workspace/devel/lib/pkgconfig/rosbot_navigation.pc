@@ -1,4 +1,4 @@
-prefix=/home/yashas/Documents/URS/ros_workspace/devel
+prefix=/home/yashas/Documents/URS-Project/ros_workspace/devel
 
 Name: rosbot_navigation
 Description: Description of rosbot_navigation

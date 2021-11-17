@@ -1,4 +1,4 @@
-prefix=/home/yashas/Documents/URS/ros_workspace/install
+prefix=/home/yashas/Documents/URS-Project/ros_workspace/install
 
 Name: rosbot_description
 Description: Description of rosbot_description
