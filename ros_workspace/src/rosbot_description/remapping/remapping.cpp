@@ -281,6 +281,17 @@ vector<vector<int>> significant_pixel_isolator(vector<vector<int>> pixArr, float
     return newPixArr;
 }
 
+// takes in two pgm arrays and subtracts the second from the first and returns a new array
+vector<vector<int>> subtract(vector<vector<int>> pixArr, vector<vector<int>> pixArr2){
+    int width = pixArr.size();
+    int height = pixArr[0].size();
+    int width2 = pixArr2.size();
+    int height2 = pixArr2[0].size();
+    
+}
+
+
+
 int main(int argc, char **argv)
 {
     auto ground_truth = convert_to_P2("ground_truth.pgm", false);
@@ -295,7 +306,9 @@ int main(int argc, char **argv)
     auto pre_remapping_cropped = crop_sides(pre_remapping);
     // output_to_file(pre_remapping_cropped, "pre_remapping_cropped.pgm");
     // cout << percent_gray(ground_truth, 5, 0, 0) << endl;
-    auto walls = significant_pixel_isolator(pre_remapping_cropped, .3);
-    output_to_file(walls, "walls.pgm");
+    auto ground_truth_walls = significant_pixel_isolator(ground_truth_cropped, .3);
+    auto pre_remapping_walls = significant_pixel_isolator(pre_remapping_cropped, .3);
+    output_to_file(ground_truth_walls, "ground_truth_walls.pgm");
+    output_to_file(pre_remapping_walls, "pre_remapping_walls.pgm");
     return 0;
 }
