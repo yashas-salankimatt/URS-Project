@@ -48,7 +48,7 @@ vector<vector<int>> convert_to_P2(string filename, bool output){
     cout << endl;
     cout << "width: " << width << endl;
     cout << "height: " << height << endl;
-    cout << "greylevels: " << graylevels << endl;
+    cout << "graylevels: " << graylevels << endl;
     cout << "size: " << size << endl;
 
     // parse data values
@@ -151,10 +151,10 @@ vector<vector<int>> crop_sides(vector<vector<int>> pixArr){
 // takes in a pgm array and an x and y location in the array
 // it then returns the radial distance to a gray pixel
 // used to determine if this is a significant pixel
-int dist_to_gray(vector<vector<int>> pixArr, int x, int y){
+int dist_to_gray(vector<vector<int>> pixArr, int x, int y, int maxRadius){
     int width = pixArr.size();
     int height = pixArr[0].size();
-    for (int i = 1; i < 5; ++i){
+    for (int i = 1; i < maxRadius; ++i){
         for (int j = -i; j <= i; ++j){
             for (int k = -i; k <= i; ++k){
                 // cout << "i: " << i << " j: " << j << " k: " << k << endl;
@@ -254,6 +254,7 @@ float percent_white(vector<vector<int>> pixArr, int radius, int x, int y){
 // takes in a pgm array and returns another pgm array with grays and significant pixels
 // where a significant pixel is defined as a pixel that has a certain small radial distance
 // to a gray pixel
+// maybe add a check for white pixels and/or black pixels within a small radius
 vector<vector<int>> significant_pixel_isolator(vector<vector<int>> pixArr, float threshold){
     int width = pixArr.size();
     int height = pixArr[0].size();
@@ -265,8 +266,8 @@ vector<vector<int>> significant_pixel_isolator(vector<vector<int>> pixArr, float
                 newPixArr[i][j] = pixArr[i][j];
             }
             else if (pixArr[i][j] == 0){
-                float percent = percent_gray(pixArr, 5, i, j);
-                if (percent > threshold){
+                float percentGray = percent_gray(pixArr, 10, i, j);
+                if (percentGray > threshold){
                     newPixArr[i][j] = 0;
                 }
                 else{
@@ -282,14 +283,85 @@ vector<vector<int>> significant_pixel_isolator(vector<vector<int>> pixArr, float
 }
 
 // takes in two pgm arrays and subtracts the second from the first and returns a new array
-vector<vector<int>> subtract(vector<vector<int>> pixArr, vector<vector<int>> pixArr2){
+vector<vector<int>> subtract_significance(vector<vector<int>> pixArr, vector<vector<int>> pixArr2){
     int width = pixArr.size();
     int height = pixArr[0].size();
     int width2 = pixArr2.size();
     int height2 = pixArr2[0].size();
-    
+    for(int i = 0; i < width; ++i){
+        for (int j = 0; j < height; ++j){
+            // pixArr[i][j] = pixArr[i][j] - pixArr2[i][j];
+            if (pixArr[i][j] == 205 && pixArr2[i][j] == 205){
+                pixArr[i][j] = 205;
+            }
+            else if (pixArr[i][j] <= 50 && pixArr2[i][j] <= 50){
+                pixArr[i][j] = 254;
+            }
+            else if (pixArr[i][j] <= 50 && pixArr2[i][j] == 125){
+                pixArr[i][j] = 0;
+            }
+            else if (pixArr[i][j] >= 200 && pixArr2[i][j] >= 200){
+                pixArr[i][j] = 254;
+            }
+            else {
+                pixArr[i][j] = 254;
+            }
+        }
+    }
+    return pixArr;
 }
 
+vector<vector<int>> subtract_non_landmarks(vector<vector<int>> pixArr, vector<vector<int>> pixArr2){
+    int width = pixArr.size();
+    int height = pixArr[0].size();
+    int width2 = pixArr2.size();
+    int height2 = pixArr2[0].size();
+    for (int i = 0; i < width; ++i){
+        for (int j = 0; j < height; ++j){
+            if (pixArr[i][j] == 205 && pixArr2[i][j] == 205){
+                pixArr[i][j] = 205;
+            }
+            else if (pixArr[i][j] <= 50 && pixArr2[i][j] <= 50){
+                pixArr[i][j] = 254;
+            }
+            else if (pixArr[i][j] >= 50 && pixArr2[i][j] <= 50){
+                pixArr[i][j] = 0;
+            }
+            else if (pixArr[i][j] >= 200 && pixArr2[i][j] >= 200){
+                pixArr[i][j] = 254;
+            }
+            else {
+                pixArr[i][j] = 254;
+            }
+        }
+    }
+    return pixArr;
+}
+
+vector<vector<int>> add_significance(vector<vector<int>> pixArr, vector<vector<int>> pixArr2){
+    int width = pixArr.size();
+    int height = pixArr[0].size();
+    int width2 = pixArr2.size();
+    int height2 = pixArr2[0].size();
+    for(int i = 0; i < width; ++i){
+        for (int j = 0; j < height; ++j){
+            // pixArr[i][j] = pixArr[i][j] - pixArr2[i][j];
+            if (pixArr[i][j] == 205 && pixArr2[i][j] == 205){
+                pixArr[i][j] = 205;
+            }
+            else if (pixArr[i][j] <= 50 && pixArr2[i][j] <= 50){
+                pixArr[i][j] = 0;
+            }
+            else if (pixArr[i][j] >= 200 && pixArr2[i][j] >= 200){
+                pixArr[i][j] = 254;
+            }
+            else {
+                pixArr[i][j] = 254;
+            }
+        }
+    }
+    return pixArr;
+}
 
 
 int main(int argc, char **argv)
@@ -310,5 +382,13 @@ int main(int argc, char **argv)
     auto pre_remapping_walls = significant_pixel_isolator(pre_remapping_cropped, .3);
     output_to_file(ground_truth_walls, "ground_truth_walls.pgm");
     output_to_file(pre_remapping_walls, "pre_remapping_walls.pgm");
+    auto ground_truth_walls_subtracted = subtract_significance(ground_truth_cropped, ground_truth_walls);
+    auto pre_remapping_walls_subtracted = subtract_significance(pre_remapping_cropped, pre_remapping_walls);
+    output_to_file(ground_truth_walls_subtracted, "ground_truth_walls_subtracted.pgm");
+    output_to_file(pre_remapping_walls_subtracted, "pre_remapping_walls_subtracted.pgm");
+    auto prev_data_deleted = subtract_non_landmarks(ground_truth_walls_subtracted, pre_remapping_walls_subtracted);
+    output_to_file(prev_data_deleted, "prev_data_deleted.pgm");
+    auto completed_remapping = add_significance(prev_data_deleted, ground_truth_walls);
+    output_to_file(completed_remapping, "completed_remapping.pgm");
     return 0;
 }
