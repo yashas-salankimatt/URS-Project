@@ -1,0 +1,18 @@
+<launch>
+    <node pkg="amcl" type="amcl" name="amcl" output="screen">
+    <remap from="scan" to="scan_amcl"/>
+    <!-- <param name="odom_frame_id" value="odom_amcl"/> -->
+    <param name="odom_model_type" value="diff-corrected"/>
+    <param name="update_min_d" value="0.1"/>
+    <param name="update_min_a" value="0.1"/>
+    <param name="min_particles" value="500"/>
+    <param name="global_frame_id" value="map_amcl"/>
+    <param name="odom_frame_id" value="odom_amcl"/>
+    <param name="base_frame_id" value="base_link_amcl"/>
+    <param name="tf_broadcast" value="true" />
+    <param name="initial_pose_x" value="0.0"/>
+    <param name="initial_pose_y" value="0.0"/>
+    <param name="initial_pose_a" value="0.0"/>
+  </node>
+   
+</launch>

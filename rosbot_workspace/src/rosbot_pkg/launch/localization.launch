@@ -1,0 +1,35 @@
+<launch>
+
+  <node pkg="teleop_twist_keyboard" type="teleop_twist_keyboard.py" name="teleop_twist_keyboard" output="screen"/>
+
+  <!-- <node pkg="move_base" type="move_base" name="move_base" output="screen">
+    <param name="controller_frequency" value="10.0"/>
+    <rosparam file="$(find rosbot_pkg)/config/costmap_common_params.yaml" command="load" ns="global_costmap" />
+    <rosparam file="$(find rosbot_pkg)/config/costmap_common_params.yaml" command="load" ns="local_costmap" />
+    <rosparam file="$(find rosbot_pkg)/config/local_costmap_params.yaml" command="load" />
+    <rosparam file="$(find rosbot_pkg)/config/global_costmap_params.yaml" command="load" />
+    <rosparam file="$(find rosbot_pkg)/config/trajectory_planner.yaml" command="load" />
+  </node> -->
+
+  <!-- <node pkg="explore_lite" type="explore" respawn="true" name="explore" output="screen">
+    <rosparam file="$(find rosbot_pkg)/config/exploration.yaml" command="load" />
+  </node> -->
+
+  <include file="$(find rosbot_pkg)/launch/map_server.launch"/>
+
+  <include file="$(find rosbot_pkg)/launch/amcl_only.launch"/>
+
+  <!-- <node pkg="rosbot_pkg" type="remap_node" name="remap_node" output="screen">
+  </node> -->
+
+  <node pkg="rosbot_pkg" type="scan_republisher" name="scan_republisher" output="screen">
+  </node>
+
+  <!-- <node pkg="tf" type="static_transform_publisher" name="static_amcl_map_publisher"
+    args="0 0 0 0 0 0 map_amcl map 100" /> -->
+
+  <include file="$(find rosbot_pkg)/launch/gmapping.launch"/>
+
+  <node pkg="rviz" type="rviz" name="rviz"/>
+
+</launch>

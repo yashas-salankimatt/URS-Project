@@ -1,0 +1,2 @@
+rosbot_pkg
+-DCATKIN_DEVEL_PREFIX=/home/yashas/Documents/URS-Project/rosbot_workspace/devel -DCMAKE_INSTALL_PREFIX=/home/yashas/Documents/URS-Project/rosbot_workspace/install -G Unix Makefiles

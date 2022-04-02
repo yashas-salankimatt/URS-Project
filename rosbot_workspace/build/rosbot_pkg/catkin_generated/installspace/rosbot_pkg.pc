@@ -1,0 +1,8 @@
+prefix=/home/yashas/Documents/URS-Project/rosbot_workspace/install
+
+Name: rosbot_pkg
+Description: Description of rosbot_pkg
+Version: 0.0.0
+Cflags: 
+Libs: -L${prefix}/lib 
+Requires: 

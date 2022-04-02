@@ -1,0 +1,7 @@
+<launch>
+    <arg name="map_file" default="$(find rosbot_pkg)/maps/standard_map_2.yaml"/>       <!-- path of map file -->
+    <node name="map_server" pkg="map_server" type="map_server" args="$(arg map_file)" respawn="true">
+        <remap from="/map" to="/map_amcl"/>
+        <remap from="/map_metadata" to="/map_amcl_metadata"/>
+    </node>
+</launch>
