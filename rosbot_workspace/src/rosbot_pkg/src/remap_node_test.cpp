@@ -16,16 +16,51 @@ tf::StampedTransform gmap_transform;
 
 std::vector<std::vector<int>> amcl_map;
 std::vector<std::vector<int>> gmap_map;
+std::vector<std::vector<int>> amcl_grid;
+std::vector<std::vector<int>> gmap_grid;
 
 int remap_radius = 0;
 double resolution = 0.05;
 int localization_radius = 0;
-double localization_confidence = 0.9;
+double localization_confidence = 0.6;
 
 double amcl_center_x = 0;
 double amcl_center_y = 0;
 double gmap_center_x = 0;
 double gmap_center_y = 0;
+
+void printTF(tf::Transform transform)
+{
+    tf::Matrix3x3 m(transform.getRotation());
+    double roll, pitch, yaw;    // vary from -PI to PI
+    m.getRPY(roll, pitch, yaw);
+    std::cout << "X: " << transform.getOrigin().x() << ", Y: " << transform.getOrigin().y() << ", R: " << yaw << std::endl;
+    // std::cout << "Rotation: " << transform.getRotation().x() << ", " << transform.getRotation().y() << ", " << transform.getRotation().z() << ", " << transform.getRotation().w() << std::endl;
+}
+
+double percent_black_calc(std::vector<std::vector<int>>& map, int x, int y, int radius, int probability_threshold)
+{
+    int black = 0;
+    int num_tested = 0;
+    for (int i = -radius; i <= radius; i++)
+    {
+        for (int j = -radius; j <= radius; j++)
+        {
+            int x_val = x + i;
+            int y_val = y + j;
+            if (x_val < 0 || x_val >= map.size() || y_val < 0 || y_val >= map[0].size())
+            {
+                continue;
+            }
+            num_tested++;
+            if (map[x + i][y + j] >= probability_threshold)
+            {
+                black++;
+            }
+        }
+    }
+    return (double)black / (double)(num_tested);
+}
 
 double map(double x, double in_min, double in_max, double out_min, double out_max) {
   return (x - in_min) * (out_max - out_min) / (in_max - in_min) + out_min;
@@ -104,11 +139,11 @@ std::vector<std::vector<int>> amcl_get_polar_grid_from_tf(tf::StampedTransform t
     return grid;
 }
 
-std::vector<std::vector<int>> amcl_get_rect_grid_from_tf(tf::StampedTransform transform, int radius){
+void amcl_get_rect_grid_from_tf(tf::StampedTransform transform, int radius){
     // get the grid from the transform
     std::vector<std::vector<int>> grid;
     if (amcl_map.size() <= 0){
-        return grid;
+        return;
     }
     int x = (transform.getOrigin().x())/resolution + amcl_center_x/resolution;
     int y = (transform.getOrigin().y())/resolution + amcl_center_y/resolution;
@@ -151,14 +186,15 @@ std::vector<std::vector<int>> amcl_get_rect_grid_from_tf(tf::StampedTransform tr
     }
     output_to_file(grid, "grid_amcl.pgm");
     output_to_file(rotated_grid, "grid_amcl_rot.pgm");
-    return grid;
+    // return rotated_grid;
+    amcl_grid = rotated_grid;
 }
 
-std::vector<std::vector<int>> gmap_get_rect_grid_from_tf(tf::StampedTransform transform, int radius){
+void gmap_get_rect_grid_from_tf(tf::StampedTransform transform, int radius){
 // get the grid from the transform
     std::vector<std::vector<int>> grid;
     if (gmap_map.size() <= 0){
-        return grid;
+        return;
     }
     int x = (transform.getOrigin().x())/resolution + gmap_center_x/resolution;
     int y = (transform.getOrigin().y())/resolution + gmap_center_y/resolution;
@@ -201,7 +237,7 @@ std::vector<std::vector<int>> gmap_get_rect_grid_from_tf(tf::StampedTransform tr
     }
     output_to_file(grid, "grid_gmap.pgm");
     output_to_file(rotated_grid, "grid_gmap_rot.pgm");
-    return grid;
+    gmap_grid = rotated_grid;
 }
 
 void amcl_map_callback(const nav_msgs::OccupancyGrid::ConstPtr& msg){
@@ -229,9 +265,40 @@ void gmap_map_callback(const nav_msgs::OccupancyGrid::ConstPtr& msg){
         }
         gmap_map.push_back(row);
     }
-    std::cout << gmap_map.size() << std::endl;
-    std::cout << gmap_map[0].size() << std::endl;
+    // std::cout << gmap_map.size() << std::endl;
+    // std::cout << gmap_map[0].size() << std::endl;
     output_to_file(gmap_map, "gmap_map.pgm");
+
+    // get the rotated grid from the gmap, then make a new map with only the overlap between the two maps
+    // std::vector<std::vector<int>> gmap_grid = gmap_get_rect_grid_from_tf(gmap_transform, localization_radius);
+    // std::vector<std::vector<int>> amcl_grid = amcl_get_rect_grid_from_tf(amcl_transform, localization_radius);
+    gmap_get_rect_grid_from_tf(gmap_transform, localization_radius);
+    amcl_get_rect_grid_from_tf(amcl_transform, localization_radius);
+    std::vector<std::vector<int>> intersect_map;
+    int pixels_black_gmap = 0;
+    int pixels_black_intersect = 0;
+    int probability_threshold = 50;
+    for (int i = 0; i < 2*localization_radius/resolution; i++){
+        std::vector<int> row;
+        for (int j = 0; j < 2*localization_radius/resolution; j++){
+            if (gmap_grid[i][j] >= probability_threshold){
+                pixels_black_gmap++;
+                int testing_radius = 1;
+                double percent_black = percent_black_calc(amcl_grid, i, j, testing_radius, probability_threshold);
+                int num_black_amcl = (int)((2*testing_radius+1)*percent_black);
+                if (num_black_amcl > 0){
+                    pixels_black_intersect++;
+                    row.push_back(gmap_grid[i][j]);
+                }
+            } else if (gmap_grid[i][j] == -1 || amcl_grid[i][j] == -1){
+                row.push_back(-1);
+            } else {row.push_back(0);}
+        }
+        intersect_map.push_back(row);
+    }
+    double percent_intersect = (double)pixels_black_intersect/(double)pixels_black_gmap;
+    std::cout << "percent_intersect: " << percent_intersect << std::endl;
+    output_to_file(intersect_map, "intersect_map.pgm");
 }
 
 void amcl_mapmetadata_callback(const nav_msgs::MapMetaData::ConstPtr& msg){
@@ -265,7 +332,7 @@ int main(int argc, char **argv){
     n.param<int>("remap_radius", remap_radius, 2);
     n.param<double>("resolution", resolution, .05);
     n.param<int>("localization_radius", localization_radius, 2);
-    n.param<double>("localization_confidence", localization_confidence, .9);
+    n.param<double>("localization_confidence", localization_confidence, .6);
     ros::Subscriber amcl_map_sub = n.subscribe("/map_amcl", 10, amcl_map_callback);
     ros::Subscriber gmap_map_sub = n.subscribe("/map", 10, gmap_map_callback);
     ros::Subscriber amcl_mapmetadata_sub = n.subscribe("/map_amcl_metadata", 10, amcl_mapmetadata_callback);
@@ -277,13 +344,13 @@ int main(int argc, char **argv){
         ros::spinOnce();
         try{
             listener.lookupTransform("/map_amcl", "/base_link_amcl", ros::Time(0), amcl_transform);
-            listener.lookupTransform("/odom", "/base_link", ros::Time(0), gmap_transform);
-            std::cout << "AMCL: ";
-            printTF(amcl_transform);
-            std::cout << "GMapping: ";
-            printTF(gmap_transform);
-            amcl_get_rect_grid_from_tf(amcl_transform, localization_radius);
-            gmap_get_rect_grid_from_tf(gmap_transform, localization_radius);
+            listener.lookupTransform("/map_gmapping", "/base_link", ros::Time(0), gmap_transform); // change the first tf to map if problems
+            // std::cout << "AMCL: ";
+            // printTF(amcl_transform);
+            // std::cout << "GMapping: ";
+            // printTF(gmap_transform);
+            // amcl_get_rect_grid_from_tf(amcl_transform, localization_radius);
+            // gmap_get_rect_grid_from_tf(gmap_transform, localization_radius);
         } catch(tf::TransformException ex){
             ROS_ERROR("%s",ex.what());
             ros::Duration(1.0).sleep();
