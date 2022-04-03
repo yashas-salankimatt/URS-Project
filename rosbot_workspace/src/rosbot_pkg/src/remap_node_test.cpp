@@ -22,6 +22,11 @@ double resolution = 0.05;
 int localization_radius = 0;
 double localization_confidence = 0.9;
 
+double amcl_center_x = 0;
+double amcl_center_y = 0;
+double gmap_center_x = 0;
+double gmap_center_y = 0;
+
 double map(double x, double in_min, double in_max, double out_min, double out_max) {
   return (x - in_min) * (out_max - out_min) / (in_max - in_min) + out_min;
 }
@@ -32,7 +37,7 @@ void output_to_file(std::vector<std::vector<int>> pixArr, std::string filename){
         // write header
     ostr << "P2" << std::endl;
     // write the rest of the metadata
-    ostr << pixArr.size() << " " << pixArr[0].size() << std::endl << 255 << std::endl;
+    ostr << pixArr[0].size() << " " << pixArr.size() << std::endl << 255 << std::endl;
     // write data
     int line_ctr = 0;
     for (int i = pixArr.size()-1; i >= 0; i--) {
@@ -105,8 +110,8 @@ std::vector<std::vector<int>> amcl_get_rect_grid_from_tf(tf::StampedTransform tr
     if (amcl_map.size() <= 0){
         return grid;
     }
-    int x = transform.getOrigin().x()/resolution + amcl_map[0].size()/2;
-    int y = (-transform.getOrigin().y())/resolution + amcl_map.size()/2;
+    int x = (transform.getOrigin().x())/resolution + amcl_center_x/resolution;
+    int y = (transform.getOrigin().y())/resolution + amcl_center_y/resolution;
     // double yaw = PI/4;
     tf::Matrix3x3 m(transform.getRotation());
     double roll, pitch, yaw;    // vary from -PI to PI
@@ -114,10 +119,10 @@ std::vector<std::vector<int>> amcl_get_rect_grid_from_tf(tf::StampedTransform tr
     for (int i = -radius/resolution; i < radius/resolution; i++){
         std::vector<int> row;
         for (int j = -radius/resolution; j < radius/resolution; j++){
-            int x_val = x + i;
-            int y_val = y + j;
+            int x_val = x + j;
+            int y_val = y + i;
             if (x_val >= 0 && x_val < amcl_map[0].size() && y_val >= 0 && y_val < amcl_map.size()){
-                row.push_back(amcl_map[x_val][y_val]);
+                row.push_back(amcl_map[y_val][x_val]);
             } else {
                 row.push_back(-1);
             }
@@ -150,24 +155,24 @@ std::vector<std::vector<int>> amcl_get_rect_grid_from_tf(tf::StampedTransform tr
 }
 
 std::vector<std::vector<int>> gmap_get_rect_grid_from_tf(tf::StampedTransform transform, int radius){
-    // get the grid from the transform
+// get the grid from the transform
     std::vector<std::vector<int>> grid;
     if (gmap_map.size() <= 0){
         return grid;
     }
-    int x = transform.getOrigin().x()/resolution + gmap_map[0].size()/2;
-    int y = (-transform.getOrigin().y())/resolution + gmap_map.size()/2;
-    // double yaw = -PI/4;
+    int x = (transform.getOrigin().x())/resolution + gmap_center_x/resolution;
+    int y = (transform.getOrigin().y())/resolution + gmap_center_y/resolution;
+    // double yaw = PI/4;
     tf::Matrix3x3 m(transform.getRotation());
     double roll, pitch, yaw;    // vary from -PI to PI
     m.getRPY(roll, pitch, yaw);
     for (int i = -radius/resolution; i < radius/resolution; i++){
         std::vector<int> row;
         for (int j = -radius/resolution; j < radius/resolution; j++){
-            int x_val = x + i;
-            int y_val = y + j;
+            int x_val = x + j;
+            int y_val = y + i;
             if (x_val >= 0 && x_val < gmap_map[0].size() && y_val >= 0 && y_val < gmap_map.size()){
-                row.push_back(gmap_map[x_val][y_val]);
+                row.push_back(gmap_map[y_val][x_val]);
             } else {
                 row.push_back(-1);
             }
@@ -215,6 +220,8 @@ void amcl_map_callback(const nav_msgs::OccupancyGrid::ConstPtr& msg){
 void gmap_map_callback(const nav_msgs::OccupancyGrid::ConstPtr& msg){
     // get the map from the occupancy grid and store it into a vector of vectors
     gmap_map.clear();
+    // std::cout << "gmap_map_callback" << std::endl;
+    // std::cout << msg->info.height << " " << msg->info.width << std::endl;
     for (int i = 0; i < msg->info.height; i++) {
         std::vector<int> row;
         for (int j = 0; j < msg->info.width; j++) {
@@ -225,6 +232,20 @@ void gmap_map_callback(const nav_msgs::OccupancyGrid::ConstPtr& msg){
     std::cout << gmap_map.size() << std::endl;
     std::cout << gmap_map[0].size() << std::endl;
     output_to_file(gmap_map, "gmap_map.pgm");
+}
+
+void amcl_mapmetadata_callback(const nav_msgs::MapMetaData::ConstPtr& msg){
+    amcl_center_x = -1*msg->origin.position.x;
+    amcl_center_y = -1*msg->origin.position.y;
+    // std::cout << "amcl_center_x: " << amcl_center_x << std::endl;
+    // std::cout << "amcl_center_y: " << amcl_center_y << std::endl;
+}
+
+void gmap_mapmetadata_callback(const nav_msgs::MapMetaData::ConstPtr& msg){
+    gmap_center_x = -1*msg->origin.position.x;
+    gmap_center_y = -1*msg->origin.position.y;
+    // std::cout << "gmap_center_x: " << gmap_center_x << std::endl;
+    // std::cout << "gmap_center_y: " << gmap_center_y << std::endl;
 }
 
 void printTF(tf::StampedTransform transform)
@@ -247,14 +268,16 @@ int main(int argc, char **argv){
     n.param<double>("localization_confidence", localization_confidence, .9);
     ros::Subscriber amcl_map_sub = n.subscribe("/map_amcl", 10, amcl_map_callback);
     ros::Subscriber gmap_map_sub = n.subscribe("/map", 10, gmap_map_callback);
+    ros::Subscriber amcl_mapmetadata_sub = n.subscribe("/map_amcl_metadata", 10, amcl_mapmetadata_callback);
+    ros::Subscriber gmap_mapmetadata_sub = n.subscribe("/map_metadata", 10, gmap_mapmetadata_callback);
     ros::Rate loop_rate(100);
     tf::TransformListener listener;
     while (ros::ok())
     {
         ros::spinOnce();
         try{
-            listener.lookupTransform("/base_link_amcl", "/map_amcl", ros::Time(0), amcl_transform);
-            listener.lookupTransform("/base_link", "/map_gmapping", ros::Time(0), gmap_transform);
+            listener.lookupTransform("/map_amcl", "/base_link_amcl", ros::Time(0), amcl_transform);
+            listener.lookupTransform("/odom", "/base_link", ros::Time(0), gmap_transform);
             std::cout << "AMCL: ";
             printTF(amcl_transform);
             std::cout << "GMapping: ";
