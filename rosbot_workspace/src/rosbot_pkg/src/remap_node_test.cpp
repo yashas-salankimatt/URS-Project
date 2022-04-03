@@ -59,11 +59,11 @@ std::vector<std::vector<int>> amcl_get_polar_grid_from_tf(tf::StampedTransform t
     int y = transform.getOrigin().y()/resolution + amcl_map.size()/2;
     tf::Matrix3x3 m(transform.getRotation());
     double roll, pitch, yaw;    // vary from -PI to PI
-    // m.getRPY(roll, pitch, yaw);
-    yaw = 0;
-    for (double angle = -PI+yaw; angle < PI+yaw; angle += 0.05){
+    m.getRPY(roll, pitch, yaw);
+    // yaw = 0;
+    for (double angle = -PI+yaw; angle < PI+yaw; angle += 0.01){
         std::vector<int> row;
-        for (double dist = 0; dist < radius/resolution; dist += 0.1){
+        for (double dist = 0; dist < radius/resolution; dist += 0.05){
             int x_val = x + (int)dist*cos(angle);
             int y_val = y + (int)dist*sin(angle);
             if (x_val >= 0 && x_val < amcl_map[0].size() && y_val >= 0 && y_val < amcl_map.size()){
@@ -82,22 +82,85 @@ std::vector<std::vector<int>> amcl_get_polar_grid_from_tf(tf::StampedTransform t
     }
     int x_ctr = cartesian_grid[0].size()/2;
     int y_ctr = cartesian_grid.size()/2;
-    for (int i = -radius/resolution; i < radius/resolution; i++){
-        for (int j = -radius/resolution; j < radius/resolution; j++){
-            
+    for (int i = 0; i < grid.size(); i++){
+        for (int j = 0; j < grid[0].size(); j++){
+            double angle = map((double)i, 0, grid.size(), PI+yaw, -PI+yaw);
+            double dist = map((double)j, 0, grid[0].size(), 0, radius/resolution);
+            int x_val = x_ctr + (int)dist*cos(angle);
+            int y_val = y_ctr + (int)dist*sin(angle);
+            if (x_val >= 0 && x_val < cartesian_grid[0].size() && y_val >= 0 && y_val < cartesian_grid.size()){
+                cartesian_grid[y_val][x_val] = grid[i][j];
+            }
         }
     }
 
     output_to_file(grid, "grid.pgm");
-    // output_to_file(grid_rect, "grid_rect.pgm");
+    output_to_file(cartesian_grid, "grid_rect.pgm");
     return grid;
 }
 
 std::vector<std::vector<int>> amcl_get_rect_grid_from_tf(tf::StampedTransform transform, int radius){
     // get the grid from the transform
     std::vector<std::vector<int>> grid;
+    if (amcl_map.size() <= 0){
+        return grid;
+    }
     int x = transform.getOrigin().x()/resolution + amcl_map[0].size()/2;
-    int y = transform.getOrigin().y()/resolution + amcl_map.size()/2;
+    int y = (-transform.getOrigin().y())/resolution + amcl_map.size()/2;
+    // double yaw = PI/4;
+    tf::Matrix3x3 m(transform.getRotation());
+    double roll, pitch, yaw;    // vary from -PI to PI
+    m.getRPY(roll, pitch, yaw);
+    for (int i = -radius/resolution; i < radius/resolution; i++){
+        std::vector<int> row;
+        for (int j = -radius/resolution; j < radius/resolution; j++){
+            int x_val = x + i;
+            int y_val = y + j;
+            if (x_val >= 0 && x_val < amcl_map[0].size() && y_val >= 0 && y_val < amcl_map.size()){
+                row.push_back(amcl_map[x_val][y_val]);
+            } else {
+                row.push_back(-1);
+            }
+        }
+        grid.push_back(row);
+    }
+
+    // rotate the grid by yaw radians
+    std::vector<std::vector<int>> rotated_grid;
+    for (int i = 0; i < grid.size(); i++){
+        std::vector<int> row;
+        for (int j = 0; j < grid[0].size(); j++){
+            int x_input = j-grid[0].size()/2;
+            int y_input = i-grid.size()/2;
+            int x_val_sub = (int)(x_input*cos(yaw) - y_input*sin(yaw));
+            int y_val_sub = (int)(x_input*sin(yaw) + y_input*cos(yaw));
+            int x_val = x_val_sub + grid[0].size()/2;
+            int y_val = y_val_sub + grid.size()/2;
+            if (x_val >= 0 && x_val < grid[0].size() && y_val >= 0 && y_val < grid.size()){
+                row.push_back(grid[y_val][x_val]);
+            } else {
+                row.push_back(-1);
+            }
+        }
+        rotated_grid.push_back(row);
+    }
+    output_to_file(grid, "grid_amcl.pgm");
+    output_to_file(rotated_grid, "grid_amcl_rot.pgm");
+    return grid;
+}
+
+std::vector<std::vector<int>> gmap_get_rect_grid_from_tf(tf::StampedTransform transform, int radius){
+    // get the grid from the transform
+    std::vector<std::vector<int>> grid;
+    if (gmap_map.size() <= 0){
+        return grid;
+    }
+    int x = transform.getOrigin().x()/resolution + gmap_map[0].size()/2;
+    int y = (-transform.getOrigin().y())/resolution + gmap_map.size()/2;
+    // double yaw = -PI/4;
+    tf::Matrix3x3 m(transform.getRotation());
+    double roll, pitch, yaw;    // vary from -PI to PI
+    m.getRPY(roll, pitch, yaw);
     for (int i = -radius/resolution; i < radius/resolution; i++){
         std::vector<int> row;
         for (int j = -radius/resolution; j < radius/resolution; j++){
@@ -111,7 +174,28 @@ std::vector<std::vector<int>> amcl_get_rect_grid_from_tf(tf::StampedTransform tr
         }
         grid.push_back(row);
     }
-    output_to_file(grid, "grid.pgm");
+
+    // rotate the grid by yaw radians
+    std::vector<std::vector<int>> rotated_grid;
+    for (int i = 0; i < grid.size(); i++){
+        std::vector<int> row;
+        for (int j = 0; j < grid[0].size(); j++){
+            int x_input = j-grid[0].size()/2;
+            int y_input = i-grid.size()/2;
+            int x_val_sub = (int)(x_input*cos(yaw) - y_input*sin(yaw));
+            int y_val_sub = (int)(x_input*sin(yaw) + y_input*cos(yaw));
+            int x_val = x_val_sub + grid[0].size()/2;
+            int y_val = y_val_sub + grid.size()/2;
+            if (x_val >= 0 && x_val < grid[0].size() && y_val >= 0 && y_val < grid.size()){
+                row.push_back(grid[y_val][x_val]);
+            } else {
+                row.push_back(-1);
+            }
+        }
+        rotated_grid.push_back(row);
+    }
+    output_to_file(grid, "grid_gmap.pgm");
+    output_to_file(rotated_grid, "grid_gmap_rot.pgm");
     return grid;
 }
 
@@ -169,13 +253,14 @@ int main(int argc, char **argv){
     {
         ros::spinOnce();
         try{
-            listener.lookupTransform("/map_amcl", "/base_link_amcl", ros::Time(0), amcl_transform);
-            listener.lookupTransform("/map_gmapping", "base_link", ros::Time(0), gmap_transform);
-            // std::cout << "AMCL: ";
-            // printTF(amcl_transform);
+            listener.lookupTransform("/base_link_amcl", "/map_amcl", ros::Time(0), amcl_transform);
+            listener.lookupTransform("/base_link", "/map_gmapping", ros::Time(0), gmap_transform);
+            std::cout << "AMCL: ";
+            printTF(amcl_transform);
             std::cout << "GMapping: ";
             printTF(gmap_transform);
-            get_grid_from_tf(amcl_transform, localization_radius);
+            amcl_get_rect_grid_from_tf(amcl_transform, localization_radius);
+            gmap_get_rect_grid_from_tf(gmap_transform, localization_radius);
         } catch(tf::TransformException ex){
             ROS_ERROR("%s",ex.what());
             ros::Duration(1.0).sleep();
