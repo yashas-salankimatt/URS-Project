@@ -12,11 +12,11 @@ ros::Publisher map_metadata_pub;
 bool new_map = false;
 
 void amcl_updated_map_callback(const nav_msgs::OccupancyGrid::ConstPtr& msg){
-    curr_map.header = msg->header;
-    curr_map.info = msg->info;
-    curr_map.data = msg->data;
-    map_pub.publish(curr_map);
-    new_map = true;
+    // curr_map.header = msg->header;
+    // curr_map.info = msg->info;
+    // curr_map.data = msg->data;
+    // map_pub.publish(curr_map);
+    // new_map = true;
 }
 
 int main(int argc, char **argv){
@@ -26,7 +26,7 @@ int main(int argc, char **argv){
     map_metadata_pub = n.advertise<nav_msgs::MapMetaData>("/map_amcl_metadata", 1);
     ros::Subscriber updated_map_sub = n.subscribe("/map_amcl_updated", 10, amcl_updated_map_callback);
     nav_msgs::GetMap srv;
-    ros::Rate loop_rate(100);
+    ros::Rate loop_rate(10);
     while (ros::ok()){
         ros::spinOnce();
         if (!new_map){

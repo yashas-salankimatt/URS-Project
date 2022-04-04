@@ -33,6 +33,8 @@
 
   <include file="$(find rosbot_pkg)/launch/gmapping.launch"/>
 
-  <node pkg="rviz" type="rviz" name="rviz"/>
+  <node pkg="rviz" type="rviz" name="rviz_gmap" args="-d $(find rosbot_pkg)/rviz/gmap_config.rviz"/>
+
+  <node pkg="rviz" type="rviz" name="rviz_amcl" args="-d $(find rosbot_pkg)/rviz/amcl_config.rviz"/>
 
 </launch>

@@ -18,8 +18,10 @@ ros::Publisher updated_map_pub;
 tf::StampedTransform amcl_transform;
 tf::StampedTransform gmap_transform;
 
+std::vector<std::vector<int>> orig_amcl_map;
 std::vector<std::vector<int>> amcl_map;
 std::vector<std::vector<int>> gmap_map;
+std::vector<std::vector<int>> orig_amcl_grid;
 std::vector<std::vector<int>> amcl_grid;
 std::vector<std::vector<int>> gmap_grid;
 
@@ -157,6 +159,56 @@ std::vector<std::vector<int>> amcl_get_polar_grid_from_tf(tf::StampedTransform t
     output_to_file(grid, "grid.pgm");
     output_to_file(cartesian_grid, "grid_rect.pgm");
     return grid;
+}
+
+void orig_amcl_get_rect_grid_from_tf(tf::StampedTransform transform, int radius){
+    // get the grid from the transform
+    std::vector<std::vector<int>> grid;
+    if (orig_amcl_map.size() <= 0){
+        return;
+    }
+    int x = (transform.getOrigin().x())/resolution + amcl_center_x/resolution;
+    int y = (transform.getOrigin().y())/resolution + amcl_center_y/resolution;
+    tf::Matrix3x3 m(transform.getRotation());
+    double roll, pitch, yaw;    // vary from -PI to PI
+    m.getRPY(roll, pitch, yaw);
+    for (int i = -radius/resolution; i < radius/resolution; i++){
+        std::vector<int> row;
+        for (int j = -radius/resolution; j < radius/resolution; j++){
+            int x_val = x + j;
+            int y_val = y + i;
+            if (x_val >= 0 && x_val < orig_amcl_map[0].size() && y_val >= 0 && y_val < orig_amcl_map.size()){
+                row.push_back(orig_amcl_map[y_val][x_val]);
+            } else {
+                row.push_back(-1);
+            }
+        }
+        grid.push_back(row);
+    }
+
+    // rotate the grid by yaw radians
+    std::vector<std::vector<int>> rotated_grid;
+    for (int i = 0; i < grid.size(); i++){
+        std::vector<int> row;
+        for (int j = 0; j < grid[0].size(); j++){
+            int x_input = j-grid[0].size()/2;
+            int y_input = i-grid.size()/2;
+            int x_val_sub = (int)(x_input*cos(yaw) - y_input*sin(yaw));
+            int y_val_sub = (int)(x_input*sin(yaw) + y_input*cos(yaw));
+            int x_val = x_val_sub + grid[0].size()/2;
+            int y_val = y_val_sub + grid.size()/2;
+            if (x_val >= 0 && x_val < grid[0].size() && y_val >= 0 && y_val < grid.size()){
+                row.push_back(grid[y_val][x_val]);
+            } else {
+                row.push_back(-1);
+            }
+        }
+        rotated_grid.push_back(row);
+    }
+    // output_to_file(grid, "grid_orig_amcl.pgm");
+    // output_to_file(rotated_grid, "grid_orig_amcl_rot.pgm");
+    // return rotated_grid;
+    orig_amcl_grid = rotated_grid;
 }
 
 void amcl_get_rect_grid_from_tf(tf::StampedTransform transform, int radius){
@@ -320,6 +372,9 @@ void amcl_map_callback(const nav_msgs::OccupancyGrid::ConstPtr& msg){
         }
         amcl_map.push_back(row);
     }
+    if (orig_amcl_map.size() <= 0){
+        orig_amcl_map = amcl_map;
+    }
     output_to_file(amcl_map, "amcl_map.pgm");
 }
 
@@ -340,8 +395,10 @@ void gmap_map_callback(const nav_msgs::OccupancyGrid::ConstPtr& msg){
     output_to_file(gmap_map, "gmap_map.pgm");
 
     // get the rotated grid from the gmap, then make a new map with only the overlap between the two maps
+    // localization step
     gmap_get_rect_grid_from_tf(gmap_transform, localization_radius);
     amcl_get_rect_grid_from_tf(amcl_transform, localization_radius);
+    orig_amcl_get_rect_grid_from_tf(amcl_transform, localization_radius);
     std::vector<std::vector<int>> intersect_map;
     int pixels_black_gmap = 0;
     int pixels_black_intersect = 0;
@@ -351,13 +408,13 @@ void gmap_map_callback(const nav_msgs::OccupancyGrid::ConstPtr& msg){
             if (gmap_grid[i][j] >= probability_threshold){
                 pixels_black_gmap++;
                 int testing_radius = 1;
-                double percent_black = percent_black_calc(amcl_grid, i, j, testing_radius, probability_threshold);
+                double percent_black = percent_black_calc(orig_amcl_grid, i, j, testing_radius, probability_threshold);
                 int num_black_amcl = (int)((2*testing_radius+1)*percent_black);
                 if (num_black_amcl > 0){
                     pixels_black_intersect++;
                     row.push_back(gmap_grid[i][j]);
                 }
-            } else if (gmap_grid[i][j] == -1 || amcl_grid[i][j] == -1){
+            } else if (gmap_grid[i][j] == -1 || orig_amcl_grid[i][j] == -1){
                 row.push_back(-1);
             } else {row.push_back(0);}
         }
@@ -366,7 +423,7 @@ void gmap_map_callback(const nav_msgs::OccupancyGrid::ConstPtr& msg){
     double percent_intersect = (double)pixels_black_intersect/(double)pixels_black_gmap;
     std::cout << "percent_intersect: " << percent_intersect << std::endl;
     if (percent_intersect >= localization_confidence){
-        if (localization_count+1 <= localization_count_threshold+5){
+        if (localization_count+1 <= localization_count_threshold){
             localization_count++;
             std::cout << "localization_count: " << localization_count << std::endl;
         }
@@ -378,21 +435,24 @@ void gmap_map_callback(const nav_msgs::OccupancyGrid::ConstPtr& msg){
     }
     output_to_file(intersect_map, "intersect_map.pgm");
 
-    // revising the amcl map 
+    // revising the amcl map
+    // TODO- optimize here so that the feedback to the amcl node is right and it keeps working
     if (localization_count >= localization_count_threshold){
         // here we need to create a new map based on the amcl map
         // then change the amcl map based on the following rules:
-        // 1. if an amcl cell is black and there is a black pixel in a 1 pixel radius in the gmap, leave the amcl pixel
-        // 2. if an amcl cell is black and there is no black pixel in a 1 pixel radius in the gmap, remove the pixel from amcl 
+        // 1. if an amcl cell is black and there is a black pixel in a 2 pixel radius in the gmap, leave the amcl pixel
+        // 2. if an amcl cell is black and there is no black pixel in a 2 pixel radius in the gmap, remove the pixel from amcl 
         // 3. if a gmap cell is black and there is no black pixel in a 1 pixel radius in the amcl map, add the pixel to the amcl map
         // then run the update_amcl_map function with this new grid to update the amcl map
         std::vector<std::vector<int>> updated_amcl_grid = amcl_grid;
         for(int i = 0; i < updated_amcl_grid.size(); i++){
             for(int j = 0; j < updated_amcl_grid[0].size(); j++){
+                // if the pixel is unknown in amcl and black in gmap, take gmap
                 if (updated_amcl_grid[i][j] == -1){
                     updated_amcl_grid[i][j] = gmap_grid[i][j];
                 }
                 if (updated_amcl_grid[i][j] >= probability_threshold){
+                    // if amcl pixel is black and gmap is black or unknown, leave amcl pixel
                     if (gmap_grid[i][j] >= probability_threshold || gmap_grid[i][j] == -1){
                         continue;
                     }
@@ -402,14 +462,14 @@ void gmap_map_callback(const nav_msgs::OccupancyGrid::ConstPtr& msg){
                     if (num_black_gmap > 0){
                         continue;
                     }
-                    else if (percent_black <= .2){
+                    else if (num_black_gmap == 0){
                         updated_amcl_grid[i][j] = 0;
                     }
                 }
                 if (gmap_grid[i][j] >= probability_threshold){
-                    int testing_radius = 1;
+                    int testing_radius = 2;
                     double percent_black = percent_black_calc(updated_amcl_grid, i, j, testing_radius, probability_threshold);
-                    if (percent_black <= .2){
+                    if (percent_black == 0){
                         updated_amcl_grid[i][j] = gmap_grid[i][j];
                     }
                 }
@@ -451,7 +511,7 @@ int main(int argc, char **argv){
     n.param<int>("remap_radius", remap_radius, 2);
     n.param<double>("resolution", resolution, .05);
     n.param<int>("localization_radius", localization_radius, 2);
-    n.param<double>("localization_confidence", localization_confidence, .5);
+    n.param<double>("localization_confidence", localization_confidence, .6);
     ros::Subscriber amcl_map_sub = n.subscribe("/map_amcl", 10, amcl_map_callback);
     ros::Subscriber gmap_map_sub = n.subscribe("/map", 10, gmap_map_callback);
     ros::Subscriber amcl_mapmetadata_sub = n.subscribe("/map_amcl_metadata", 10, amcl_mapmetadata_callback);

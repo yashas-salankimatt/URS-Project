@@ -3,5 +3,6 @@
     <node name="map_server" pkg="map_server" type="map_server" args="$(arg map_file)" respawn="true">
         <remap from="/map" to="/map_amcl"/>
         <remap from="/map_metadata" to="/map_amcl_metadata"/>
+        <param name="frame_id" value="map_amcl"/>
     </node>
 </launch>
