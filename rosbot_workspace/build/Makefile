@@ -298,6 +298,19 @@ drive_controller_node/fast:
 .PHONY : drive_controller_node/fast
 
 #=============================================================================
+# Target rules for targets named map_handler
+
+# Build rule for target.
+map_handler: cmake_check_build_system
+	$(MAKE) -f CMakeFiles/Makefile2 map_handler
+.PHONY : map_handler
+
+# fast build rule for target.
+map_handler/fast:
+	$(MAKE) -f rosbot_pkg/CMakeFiles/map_handler.dir/build.make rosbot_pkg/CMakeFiles/map_handler.dir/build
+.PHONY : map_handler/fast
+
+#=============================================================================
 # Target rules for targets named rosbot_pkg_node
 
 # Build rule for target.
@@ -1282,6 +1295,7 @@ help:
 	@echo "... gtest_main"
 	@echo "... gtest"
 	@echo "... drive_controller_node"
+	@echo "... map_handler"
 	@echo "... rosbot_pkg_node"
 	@echo "... visualization_msgs_generate_messages_nodejs"
 	@echo "... visualization_msgs_generate_messages_lisp"

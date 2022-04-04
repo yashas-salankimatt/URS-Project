@@ -291,6 +291,7 @@ set(CMAKE_DEPEND_INFO_FILES
   "gtest/googletest/CMakeFiles/gtest_main.dir/DependInfo.cmake"
   "gtest/googletest/CMakeFiles/gtest.dir/DependInfo.cmake"
   "rosbot_pkg/CMakeFiles/drive_controller_node.dir/DependInfo.cmake"
+  "rosbot_pkg/CMakeFiles/map_handler.dir/DependInfo.cmake"
   "rosbot_pkg/CMakeFiles/rosbot_pkg_node.dir/DependInfo.cmake"
   "rosbot_pkg/CMakeFiles/visualization_msgs_generate_messages_nodejs.dir/DependInfo.cmake"
   "rosbot_pkg/CMakeFiles/visualization_msgs_generate_messages_lisp.dir/DependInfo.cmake"

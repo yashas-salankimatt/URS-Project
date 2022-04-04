@@ -145,6 +145,7 @@ add_executable(action_controller_node src/action_controller.cpp)
 add_executable(drive_controller_node src/drive_controller.cpp)
 add_executable(remap_node src/remap_node_test.cpp)
 add_executable(scan_republisher src/scan_republisher.cpp)
+add_executable(map_handler src/map_handler.cpp)
 
 
 ## Rename C++ executable without prefix
@@ -176,6 +177,10 @@ target_link_libraries(remap_node
 )
 
 target_link_libraries(scan_republisher
+  ${catkin_LIBRARIES}
+)
+
+target_link_libraries(map_handler
   ${catkin_LIBRARIES}
 )
 
@@ -263,7 +268,7 @@ install(DIRECTORY deploymentScripts/
   USE_SOURCE_PERMISSIONS
 )
 
-install(TARGETS rosbot_pkg_node action_controller_node drive_controller_node remap_node scan_republisher
+install(TARGETS rosbot_pkg_node action_controller_node drive_controller_node remap_node scan_republisher map_handler
   ARCHIVE DESTINATION ${CATKIN_PACKAGE_LIB_DESTINATION}
   LIBRARY DESTINATION ${CATKIN_PACKAGE_LIB_DESTINATION}
   RUNTIME DESTINATION ${CATKIN_PACKAGE_BIN_DESTINATION})

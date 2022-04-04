@@ -25,6 +25,9 @@
   <node pkg="rosbot_pkg" type="scan_republisher" name="scan_republisher" output="screen">
   </node>
 
+  <node pkg="rosbot_pkg" type="map_handler" name="map_handler" output="screen">
+  </node>
+
   <!-- <node pkg="tf" type="static_transform_publisher" name="static_amcl_map_publisher"
     args="0 0 0 0 0 0 map_amcl map 100" /> -->
 

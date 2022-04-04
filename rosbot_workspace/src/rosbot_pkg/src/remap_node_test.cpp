@@ -1,8 +1,10 @@
 #include <ros/ros.h>
 #include <geometry_msgs/PoseStamped.h>
 #include <nav_msgs/OccupancyGrid.h>
+#include <nav_msgs/MapMetaData.h>
 #include <tf/transform_broadcaster.h>
 #include <tf/transform_listener.h>
+#include <std_msgs/Header.h>
 #include <fstream>
 #include <sstream>
 #include <string>
@@ -10,6 +12,8 @@
 #include <math.h>
 
 #define PI 3.14159265
+
+ros::Publisher updated_map_pub;
 
 tf::StampedTransform amcl_transform;
 tf::StampedTransform gmap_transform;
@@ -26,11 +30,14 @@ double localization_confidence = 0.6;
 int localization_count_threshold = 10;
 int localization_count = 0;
 bool localized = false;
+int probability_threshold = 50;
 
 double amcl_center_x = 0;
 double amcl_center_y = 0;
 double gmap_center_x = 0;
 double gmap_center_y = 0;
+
+nav_msgs::OccupancyGrid updated_map;
 
 void printTF(tf::Transform transform)
 {
@@ -41,7 +48,7 @@ void printTF(tf::Transform transform)
     // std::cout << "Rotation: " << transform.getRotation().x() << ", " << transform.getRotation().y() << ", " << transform.getRotation().z() << ", " << transform.getRotation().w() << std::endl;
 }
 
-double percent_black_calc(std::vector<std::vector<int>>& map, int x, int y, int radius, int probability_threshold)
+double percent_black_calc(std::vector<std::vector<int>>& map, int x, int y, int radius, int prob_threshold)
 {
     int black = 0;
     int num_tested = 0;
@@ -56,7 +63,7 @@ double percent_black_calc(std::vector<std::vector<int>>& map, int x, int y, int 
                 continue;
             }
             num_tested++;
-            if (map[x + i][y + j] >= probability_threshold)
+            if (map[x + i][y + j] >= prob_threshold)
             {
                 black++;
             }
@@ -93,6 +100,16 @@ void output_to_file(std::vector<std::vector<int>> pixArr, std::string filename){
         ostr << std::endl;
     }
     ostr.close();
+}
+
+void publish_updated_map(std::vector<std::vector<int>> map_in){
+    for (int i = 0; i < map_in.size(); i++){
+        for(int j = 0; j < map_in[0].size(); j++){
+            updated_map.data[i*map_in[0].size() + j] = map_in[i][j];
+        }
+    }
+    std::cout << "published map" << std::endl;
+    updated_map_pub.publish(updated_map);
 }
 
 std::vector<std::vector<int>> amcl_get_polar_grid_from_tf(tf::StampedTransform transform, int radius){
@@ -284,6 +301,7 @@ void update_amcl_map(std::vector<std::vector<int>> in_grid, tf::StampedTransform
         }
     }
     output_to_file(updated_amcl_map, "updated_amcl_map.pgm");
+    publish_updated_map(updated_amcl_map);
     output_to_file(unrotated_grid, "unrotated_grid.pgm");
     std::cout << "updated amcl map" << std::endl;
 }
@@ -291,6 +309,9 @@ void update_amcl_map(std::vector<std::vector<int>> in_grid, tf::StampedTransform
 void amcl_map_callback(const nav_msgs::OccupancyGrid::ConstPtr& msg){
     // get the map from occupancy grid and store it into a vector of vectors
     std::cout << "Getting AMCL map" << std::endl;
+    updated_map.header = msg->header;
+    updated_map.info = msg->info;
+    updated_map.data = msg->data;
     amcl_map.clear();
     for (int i = 0; i < msg->info.height; i++) {
         std::vector<int> row;
@@ -324,7 +345,6 @@ void gmap_map_callback(const nav_msgs::OccupancyGrid::ConstPtr& msg){
     std::vector<std::vector<int>> intersect_map;
     int pixels_black_gmap = 0;
     int pixels_black_intersect = 0;
-    int probability_threshold = 50;
     for (int i = 0; i < 2*localization_radius/resolution; i++){
         std::vector<int> row;
         for (int j = 0; j < 2*localization_radius/resolution; j++){
@@ -360,7 +380,43 @@ void gmap_map_callback(const nav_msgs::OccupancyGrid::ConstPtr& msg){
 
     // revising the amcl map 
     if (localization_count >= localization_count_threshold){
-        update_amcl_map(intersect_map, amcl_transform);
+        // here we need to create a new map based on the amcl map
+        // then change the amcl map based on the following rules:
+        // 1. if an amcl cell is black and there is a black pixel in a 1 pixel radius in the gmap, leave the amcl pixel
+        // 2. if an amcl cell is black and there is no black pixel in a 1 pixel radius in the gmap, remove the pixel from amcl 
+        // 3. if a gmap cell is black and there is no black pixel in a 1 pixel radius in the amcl map, add the pixel to the amcl map
+        // then run the update_amcl_map function with this new grid to update the amcl map
+        std::vector<std::vector<int>> updated_amcl_grid = amcl_grid;
+        for(int i = 0; i < updated_amcl_grid.size(); i++){
+            for(int j = 0; j < updated_amcl_grid[0].size(); j++){
+                if (updated_amcl_grid[i][j] == -1){
+                    updated_amcl_grid[i][j] = gmap_grid[i][j];
+                }
+                if (updated_amcl_grid[i][j] >= probability_threshold){
+                    if (gmap_grid[i][j] >= probability_threshold || gmap_grid[i][j] == -1){
+                        continue;
+                    }
+                    int testing_radius = 2;
+                    double percent_black = percent_black_calc(gmap_grid, i, j, testing_radius, probability_threshold);
+                    int num_black_gmap = (int)((2*testing_radius+1)*percent_black);
+                    if (num_black_gmap > 0){
+                        continue;
+                    }
+                    else if (percent_black <= .2){
+                        updated_amcl_grid[i][j] = 0;
+                    }
+                }
+                if (gmap_grid[i][j] >= probability_threshold){
+                    int testing_radius = 1;
+                    double percent_black = percent_black_calc(updated_amcl_grid, i, j, testing_radius, probability_threshold);
+                    if (percent_black <= .2){
+                        updated_amcl_grid[i][j] = gmap_grid[i][j];
+                    }
+                }
+            }
+        }
+        output_to_file(updated_amcl_grid, "updated_amcl_grid.pgm");
+        update_amcl_map(updated_amcl_grid, amcl_transform);
     }
 }
 
@@ -395,11 +451,12 @@ int main(int argc, char **argv){
     n.param<int>("remap_radius", remap_radius, 2);
     n.param<double>("resolution", resolution, .05);
     n.param<int>("localization_radius", localization_radius, 2);
-    n.param<double>("localization_confidence", localization_confidence, .6);
+    n.param<double>("localization_confidence", localization_confidence, .5);
     ros::Subscriber amcl_map_sub = n.subscribe("/map_amcl", 10, amcl_map_callback);
     ros::Subscriber gmap_map_sub = n.subscribe("/map", 10, gmap_map_callback);
     ros::Subscriber amcl_mapmetadata_sub = n.subscribe("/map_amcl_metadata", 10, amcl_mapmetadata_callback);
     ros::Subscriber gmap_mapmetadata_sub = n.subscribe("/map_metadata", 10, gmap_mapmetadata_callback);
+    updated_map_pub = n.advertise<nav_msgs::OccupancyGrid>("/map_amcl_updated", 1);
     ros::Rate loop_rate(100);
     tf::TransformListener listener;
     while (ros::ok())

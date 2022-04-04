@@ -183,6 +183,21 @@ drive_controller_node/fast:
 .PHONY : drive_controller_node/fast
 
 # Convenience name for target.
+rosbot_pkg/CMakeFiles/map_handler.dir/rule:
+	cd /home/yashas/Documents/URS-Project/rosbot_workspace/build && $(MAKE) -f CMakeFiles/Makefile2 rosbot_pkg/CMakeFiles/map_handler.dir/rule
+.PHONY : rosbot_pkg/CMakeFiles/map_handler.dir/rule
+
+# Convenience name for target.
+map_handler: rosbot_pkg/CMakeFiles/map_handler.dir/rule
+
+.PHONY : map_handler
+
+# fast build rule for target.
+map_handler/fast:
+	cd /home/yashas/Documents/URS-Project/rosbot_workspace/build && $(MAKE) -f rosbot_pkg/CMakeFiles/map_handler.dir/build.make rosbot_pkg/CMakeFiles/map_handler.dir/build
+.PHONY : map_handler/fast
+
+# Convenience name for target.
 rosbot_pkg/CMakeFiles/rosbot_pkg_node.dir/rule:
 	cd /home/yashas/Documents/URS-Project/rosbot_workspace/build && $(MAKE) -f CMakeFiles/Makefile2 rosbot_pkg/CMakeFiles/rosbot_pkg_node.dir/rule
 .PHONY : rosbot_pkg/CMakeFiles/rosbot_pkg_node.dir/rule
@@ -1346,6 +1361,33 @@ src/drive_controller.cpp.s:
 	cd /home/yashas/Documents/URS-Project/rosbot_workspace/build && $(MAKE) -f rosbot_pkg/CMakeFiles/drive_controller_node.dir/build.make rosbot_pkg/CMakeFiles/drive_controller_node.dir/src/drive_controller.cpp.s
 .PHONY : src/drive_controller.cpp.s
 
+src/map_handler.o: src/map_handler.cpp.o
+
+.PHONY : src/map_handler.o
+
+# target to build an object file
+src/map_handler.cpp.o:
+	cd /home/yashas/Documents/URS-Project/rosbot_workspace/build && $(MAKE) -f rosbot_pkg/CMakeFiles/map_handler.dir/build.make rosbot_pkg/CMakeFiles/map_handler.dir/src/map_handler.cpp.o
+.PHONY : src/map_handler.cpp.o
+
+src/map_handler.i: src/map_handler.cpp.i
+
+.PHONY : src/map_handler.i
+
+# target to preprocess a source file
+src/map_handler.cpp.i:
+	cd /home/yashas/Documents/URS-Project/rosbot_workspace/build && $(MAKE) -f rosbot_pkg/CMakeFiles/map_handler.dir/build.make rosbot_pkg/CMakeFiles/map_handler.dir/src/map_handler.cpp.i
+.PHONY : src/map_handler.cpp.i
+
+src/map_handler.s: src/map_handler.cpp.s
+
+.PHONY : src/map_handler.s
+
+# target to generate assembly for a file
+src/map_handler.cpp.s:
+	cd /home/yashas/Documents/URS-Project/rosbot_workspace/build && $(MAKE) -f rosbot_pkg/CMakeFiles/map_handler.dir/build.make rosbot_pkg/CMakeFiles/map_handler.dir/src/map_handler.cpp.s
+.PHONY : src/map_handler.cpp.s
+
 src/remap_node_test.o: src/remap_node_test.cpp.o
 
 .PHONY : src/remap_node_test.o
@@ -1439,6 +1481,7 @@ help:
 	@echo "... rebuild_cache"
 	@echo "... test"
 	@echo "... drive_controller_node"
+	@echo "... map_handler"
 	@echo "... rosbot_pkg_node"
 	@echo "... visualization_msgs_generate_messages_nodejs"
 	@echo "... visualization_msgs_generate_messages_lisp"
@@ -1521,6 +1564,9 @@ help:
 	@echo "... src/drive_controller.o"
 	@echo "... src/drive_controller.i"
 	@echo "... src/drive_controller.s"
+	@echo "... src/map_handler.o"
+	@echo "... src/map_handler.i"
+	@echo "... src/map_handler.s"
 	@echo "... src/remap_node_test.o"
 	@echo "... src/remap_node_test.i"
 	@echo "... src/remap_node_test.s"

@@ -13,9 +13,13 @@ geometry_msgs/PoseStamped.h
 -
 nav_msgs/OccupancyGrid.h
 -
+nav_msgs/MapMetaData.h
+-
 tf/transform_broadcaster.h
 -
 tf/transform_listener.h
+-
+std_msgs/Header.h
 -
 fstream
 -
