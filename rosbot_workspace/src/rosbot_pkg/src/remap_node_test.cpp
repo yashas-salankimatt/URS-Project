@@ -32,7 +32,7 @@ double localization_confidence = 0.6;
 int localization_count_threshold = 10;
 int localization_count = 0;
 bool localized = false;
-int probability_threshold = 50;
+int probability_threshold = 25;
 
 double amcl_center_x = 0;
 double amcl_center_y = 0;
