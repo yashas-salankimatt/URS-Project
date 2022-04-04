@@ -23,6 +23,9 @@ int remap_radius = 0;
 double resolution = 0.05;
 int localization_radius = 0;
 double localization_confidence = 0.6;
+int localization_count_threshold = 10;
+int localization_count = 0;
+bool localized = false;
 
 double amcl_center_x = 0;
 double amcl_center_y = 0;
@@ -147,7 +150,6 @@ void amcl_get_rect_grid_from_tf(tf::StampedTransform transform, int radius){
     }
     int x = (transform.getOrigin().x())/resolution + amcl_center_x/resolution;
     int y = (transform.getOrigin().y())/resolution + amcl_center_y/resolution;
-    // double yaw = PI/4;
     tf::Matrix3x3 m(transform.getRotation());
     double roll, pitch, yaw;    // vary from -PI to PI
     m.getRPY(roll, pitch, yaw);
@@ -240,8 +242,55 @@ void gmap_get_rect_grid_from_tf(tf::StampedTransform transform, int radius){
     gmap_grid = rotated_grid;
 }
 
+void update_amcl_map(std::vector<std::vector<int>> in_grid, tf::StampedTransform transform){
+    if (amcl_map.size() <= 0 || in_grid.size() <= 0){
+        return;
+    }
+    int x = ((transform.getOrigin().x())/resolution + amcl_center_x/resolution)-in_grid.size()/2;
+    int y = ((transform.getOrigin().y())/resolution + amcl_center_y/resolution)-in_grid[0].size()/2;
+    tf::Matrix3x3 m(transform.getRotation());
+    double roll, pitch, yaw;    // vary from -PI to PI
+    m.getRPY(roll, pitch, yaw);
+    // unrotate the grid by yaw radians
+    std::vector<std::vector<int>> unrotated_grid;
+    for (int i = 0; i < in_grid.size(); i++){
+        std::vector<int> row;
+        for (int j = 0; j < in_grid[0].size(); j++){
+            int x_input = j-in_grid[0].size()/2;
+            int y_input = i-in_grid.size()/2;
+            int x_val_sub = (int)(x_input*cos(yaw) + y_input*sin(yaw));
+            int y_val_sub = (int)(-x_input*sin(yaw) + y_input*cos(yaw));
+            int x_val = x_val_sub + in_grid[0].size()/2;
+            int y_val = y_val_sub + in_grid.size()/2;
+            if (x_val >= 0 && x_val < in_grid[0].size() && y_val >= 0 && y_val < in_grid.size()){
+                row.push_back(in_grid[y_val][x_val]);
+            } else {
+                row.push_back(-1);
+            }
+        }
+        unrotated_grid.push_back(row);
+    }
+    // update the amcl map
+    // std::vector<std::vector<int>> test_map(unrotated_grid.size(), std::vector<int>(unrotated_grid[0].size(), 99));
+    // unrotated_grid = test_map;
+    std::vector<std::vector<int>> updated_amcl_map = amcl_map;
+    for (int i = 0; i < unrotated_grid.size(); i++){
+        for (int j = 0; j < unrotated_grid[0].size(); j++){
+            int x_val = x + j;
+            int y_val = y + i;
+            if (x_val >= 0 && x_val < amcl_map[0].size() && y_val >= 0 && y_val < amcl_map.size()){
+                updated_amcl_map[y_val][x_val] = unrotated_grid[i][j];
+            }
+        }
+    }
+    output_to_file(updated_amcl_map, "updated_amcl_map.pgm");
+    output_to_file(unrotated_grid, "unrotated_grid.pgm");
+    std::cout << "updated amcl map" << std::endl;
+}
+
 void amcl_map_callback(const nav_msgs::OccupancyGrid::ConstPtr& msg){
     // get the map from occupancy grid and store it into a vector of vectors
+    std::cout << "Getting AMCL map" << std::endl;
     amcl_map.clear();
     for (int i = 0; i < msg->info.height; i++) {
         std::vector<int> row;
@@ -270,8 +319,6 @@ void gmap_map_callback(const nav_msgs::OccupancyGrid::ConstPtr& msg){
     output_to_file(gmap_map, "gmap_map.pgm");
 
     // get the rotated grid from the gmap, then make a new map with only the overlap between the two maps
-    // std::vector<std::vector<int>> gmap_grid = gmap_get_rect_grid_from_tf(gmap_transform, localization_radius);
-    // std::vector<std::vector<int>> amcl_grid = amcl_get_rect_grid_from_tf(amcl_transform, localization_radius);
     gmap_get_rect_grid_from_tf(gmap_transform, localization_radius);
     amcl_get_rect_grid_from_tf(amcl_transform, localization_radius);
     std::vector<std::vector<int>> intersect_map;
@@ -298,7 +345,23 @@ void gmap_map_callback(const nav_msgs::OccupancyGrid::ConstPtr& msg){
     }
     double percent_intersect = (double)pixels_black_intersect/(double)pixels_black_gmap;
     std::cout << "percent_intersect: " << percent_intersect << std::endl;
+    if (percent_intersect >= localization_confidence){
+        if (localization_count+1 <= localization_count_threshold+5){
+            localization_count++;
+            std::cout << "localization_count: " << localization_count << std::endl;
+        }
+    } else {
+        if (localization_count-1 >= 0){
+            localization_count--;
+            std::cout << "localization_count: " << localization_count << std::endl;
+        }
+    }
     output_to_file(intersect_map, "intersect_map.pgm");
+
+    // revising the amcl map 
+    if (localization_count >= localization_count_threshold){
+        update_amcl_map(intersect_map, amcl_transform);
+    }
 }
 
 void amcl_mapmetadata_callback(const nav_msgs::MapMetaData::ConstPtr& msg){
